@@ -1,3 +1,4 @@
+#include "version.h"
 #include <arpa/inet.h>
 #include <netinet/in.h>
 #include <stdio.h>
@@ -5,16 +6,19 @@
 #include <string.h>
 #include <sys/socket.h>
 #include <unistd.h>
-#include "version.h"
 
-#define CONNECTIONS_BACKLOG 1
 #define SERVER_PORT 80
+#define TARGET_IP "173.194.217.94"
 #define TARGET_PORT 3223
 #define RESPONSE_SIZE 2000
+#define MAX_CLIENTS 30
 
 int main(int argc, char const *argv[]) {
+  signal(SIGPIPE, SIG_IGN);
+
   printf("starting proxy %s\n", VERSION);
 
+  int i = 0;
   struct sockaddr_in serverAddress;
   int serverAddrLen = sizeof(serverAddress);
   int serverFd;
@@ -35,7 +39,7 @@ int main(int argc, char const *argv[]) {
     exit(EXIT_FAILURE);
   }
 
-  if (listen(serverFd, CONNECTIONS_BACKLOG) < 0) {
+  if (listen(serverFd, MAX_CLIENTS) < 0) {
     perror("server listening");
     exit(EXIT_FAILURE);
   }
@@ -57,7 +61,7 @@ int main(int argc, char const *argv[]) {
     int targetFd;
 
     targetAddress.sin_family = AF_INET;
-    targetAddress.sin_addr.s_addr = inet_addr("173.194.217.94");
+    targetAddress.sin_addr.s_addr = inet_addr(TARGET_IP);
     targetAddress.sin_port = htons(80);
     memset(targetAddress.sin_zero, '\0', sizeof targetAddress.sin_zero);
 
@@ -83,8 +87,7 @@ int main(int argc, char const *argv[]) {
 
     while ((n = read(targetFd, response, RESPONSE_SIZE)) > 0) {
       if (write(clientFd, response, n) < 0) {
-        perror("writing data to client");
-        exit(EXIT_FAILURE);
+        printf("writing content to client failed - probably SIGPIPE");
       }
     }
 
