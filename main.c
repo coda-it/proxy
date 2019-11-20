@@ -1,4 +1,3 @@
-#include "utils.h"
 #include "version.h"
 #include <arpa/inet.h>
 #include <netinet/in.h>
@@ -23,6 +22,11 @@ int main(int argc, char const *argv[]) {
   printf("reading proxy config file\n");
   FILE *cnfPtr;
   cnfPtr = fopen(CONFIG_FILE, "r");
+
+  if (cnfPtr == NULL) {
+    perror("proxy.db is not defined");
+    exit(EXIT_FAILURE);
+  }
 
   int i = 0;
   char c;
@@ -72,7 +76,7 @@ int main(int argc, char const *argv[]) {
   int serverFd;
 
   if ((serverFd = socket(AF_INET, SOCK_STREAM, 0)) == 0) {
-    perror("server socker\n");
+    perror("server socker");
     exit(EXIT_FAILURE);
   }
 
@@ -83,12 +87,12 @@ int main(int argc, char const *argv[]) {
 
   if (bind(serverFd, (struct sockaddr *)&serverAddress, sizeof(serverAddress)) <
       0) {
-    perror("server binding\n");
+    perror("server binding");
     exit(EXIT_FAILURE);
   }
 
   if (listen(serverFd, MAX_CLIENTS) < 0) {
-    perror("server listening\n");
+    perror("server listening");
     exit(EXIT_FAILURE);
   }
 
@@ -98,7 +102,7 @@ int main(int argc, char const *argv[]) {
     printf("waiting for client connection\n");
     if ((clientFd = accept(serverFd, (struct sockaddr *)&serverAddress,
                            (socklen_t *)&serverAddrLen)) < 0) {
-      perror("client connection accept\n");
+      perror("client connection accept");
       exit(EXIT_FAILURE);
     }
 
@@ -114,20 +118,20 @@ int main(int argc, char const *argv[]) {
     memset(targetAddress.sin_zero, '\0', sizeof targetAddress.sin_zero);
 
     if ((targetFd = socket(AF_INET, SOCK_STREAM, 0)) == 0) {
-      perror("target socket\n");
+      perror("target socket");
       exit(EXIT_FAILURE);
     }
 
     if (connect(targetFd, (struct sockaddr *)&targetAddress,
                 sizeof(targetAddress)) < 0) {
-      perror("target connection\n");
+      perror("target connection");
       exit(EXIT_FAILURE);
     }
 
     char request[] = "GET /\n\r";
 
     if (write(targetFd, request, strlen(request)) < 0) {
-      perror("sending data to target\n");
+      perror("sending data to target");
     }
 
     char response[RESPONSE_SIZE];
