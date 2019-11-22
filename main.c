@@ -11,7 +11,7 @@
 #define CONFIG_FILE "./proxy.db"
 #define IP_PORT_SEPARATOR ":"
 #define SERVER_PORT 80
-#define RESPONSE_SIZE 2000
+#define MAX_REQUEST_SIZE 8192
 #define MAX_CLIENTS 30
 
 int main(int argc, char const *argv[]) {
@@ -29,6 +29,7 @@ int main(int argc, char const *argv[]) {
   }
 
   int i = 0;
+  int n;
   char c;
   char *str;
 
@@ -109,7 +110,6 @@ int main(int argc, char const *argv[]) {
     printf("client-server connection established\n");
 
     struct sockaddr_in targetAddress;
-    int targetAddLen = sizeof(targetAddress);
     int targetFd;
 
     targetAddress.sin_family = AF_INET;
@@ -128,21 +128,37 @@ int main(int argc, char const *argv[]) {
       exit(EXIT_FAILURE);
     }
 
-    char request[] = "GET /\n\r";
+    printf("sending request from client to target\n");
+    char request[MAX_REQUEST_SIZE];
+    memset(request, '\0', sizeof request);
 
-    if (write(targetFd, request, strlen(request)) < 0) {
-      perror("sending data to target");
-    }
+    while ((n = read(clientFd, request, MAX_REQUEST_SIZE)) > 0) {
+      if (write(targetFd, request, n) < 0) {
+        printf("writing content from client to target failed - probably "
+               "SIGPIPE\n");
+      }
 
-    char response[RESPONSE_SIZE];
-    int n;
-
-    while ((n = read(targetFd, response, RESPONSE_SIZE)) > 0) {
-      if (write(clientFd, response, n) < 0) {
-        printf("writing content to client failed - probably SIGPIPE\n");
+      if (n < MAX_REQUEST_SIZE) {
+        break;
       }
     }
 
+    printf("sending response from target to client\n");
+    char response[MAX_REQUEST_SIZE];
+    memset(response, '\0', sizeof response);
+
+    while ((n = read(targetFd, response, MAX_REQUEST_SIZE)) > 0) {
+      if (write(clientFd, response, n) < 0) {
+        printf("writing content from target to client failed - probably "
+               "SIGPIPE\n");
+      }
+
+      if (n < MAX_REQUEST_SIZE) {
+        break;
+      }
+    }
+
+    printf("request completed\n");
     close(clientFd);
     close(targetFd);
   }
