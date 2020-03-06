@@ -97,7 +97,6 @@ int main(int argc, char const *argv[]) {
     for (clientFd = 0; clientFd <= maxClientFd; clientFd++) {
       if (FD_ISSET(clientFd, &clientFds)) {
         if (clientFd == serverFd) {
-          // new connection
           if ((newClientFd = accept(serverFd, (struct sockaddr *)&serverAddress,
                                     (socklen_t *)&serverAddrLen)) < 0) {
             perror("client connection accept");
@@ -134,12 +133,15 @@ int main(int argc, char const *argv[]) {
           char request[MAX_REQUEST_SIZE];
           memset(request, '\0', sizeof request);
 
-          while ((n = read(clientFd, request, sizeof(request))) > 0) {
+          while ((n = read(clientFd, request, sizeof(request) - 1)) > 0) {
             if (write(targetFd, request, n) < 0) {
               perror("writing content from client to target failed - probably "
                      "SIGPIPE\n");
             }
-            if (n < MAX_REQUEST_SIZE) {
+
+            char *requestEnd = strstr(request, "\r\n\r\n");
+            memset(request, '\0', sizeof request);
+            if (requestEnd != NULL) {
               break;
             }
           }
@@ -148,15 +150,59 @@ int main(int argc, char const *argv[]) {
           char response[MAX_REQUEST_SIZE];
           memset(response, '\0', sizeof response);
 
-          while ((n = read(targetFd, response, sizeof(response))) > 0) {
-            printf("%s", response);
+          int bodyLen = 0;
+          int isBody = 0;
+          int contentLen = 0;
+          char *contentLenStr;
+          char *marker;
+
+          while ((n = read(targetFd, response, sizeof(response) - 1)) > 0) {
+            marker = strstr(response, "\r\n\r\n");
+
+            printf("\ns---------\n%s\n----------\n%s\n---------e", response,
+                   marker);
+
+            if (isBody == 0) {
+              contentLenStr = getHeaderVal(response, "Content-Length");
+            } else if (isBody == 1) {
+              bodyLen += n;
+              printf("\nLEN = [%d]", n);
+            }
+
+            if (isBody == 0 && marker != NULL) {
+              isBody = 1;
+              bodyLen += strlen(marker) - 4;
+              printf("\nLENX = [%lu]", strlen(marker) - 4);
+            }
+
             if (write(clientFd, response, n) < 0) {
               perror("writing content from target to client failed - probably "
                      "SIGPIPE\n");
             }
-            if (n < MAX_REQUEST_SIZE) {
+
+            if (contentLenStr != NULL) {
+              printf("\n-------------------- [%s]", contentLenStr);
+              contentLen = atoi(contentLenStr);
+              contentLenStr = NULL;
+            }
+
+            printf("\n [%d / %d] \n", contentLen, bodyLen);
+            printf("\n-=================-\n");
+
+            if (contentLen != 0) {
+              printf("\n=> contentLen/bodyLen [%d / %d]", contentLen, bodyLen);
+              if (bodyLen == contentLen) {
+                break;
+              }
+            }
+
+            marker = strstr(response, "0\r\n\r\n");
+
+            if (marker != NULL) {
               break;
             }
+
+            memset(response, '\0', sizeof response);
           }
 
           printf("request completed\n");
