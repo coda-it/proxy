@@ -159,20 +159,15 @@ int main(int argc, char const *argv[]) {
           while ((n = read(targetFd, response, sizeof(response) - 1)) > 0) {
             marker = strstr(response, "\r\n\r\n");
 
-            printf("\ns---------\n%s\n----------\n%s\n---------e", response,
-                   marker);
-
             if (isBody == 0) {
               contentLenStr = getHeaderVal(response, "Content-Length");
             } else if (isBody == 1) {
               bodyLen += n;
-              printf("\nLEN = [%d]", n);
             }
 
             if (isBody == 0 && marker != NULL) {
               isBody = 1;
               bodyLen += strlen(marker) - 4;
-              printf("\nLENX = [%lu]", strlen(marker) - 4);
             }
 
             if (write(clientFd, response, n) < 0) {
@@ -181,16 +176,11 @@ int main(int argc, char const *argv[]) {
             }
 
             if (contentLenStr != NULL) {
-              printf("\n-------------------- [%s]", contentLenStr);
               contentLen = atoi(contentLenStr);
               contentLenStr = NULL;
             }
 
-            printf("\n [%d / %d] \n", contentLen, bodyLen);
-            printf("\n-=================-\n");
-
             if (contentLen != 0) {
-              printf("\n=> contentLen/bodyLen [%d / %d]", contentLen, bodyLen);
               if (bodyLen == contentLen) {
                 break;
               }
