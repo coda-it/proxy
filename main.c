@@ -1,3 +1,4 @@
+#include "handlers.h"
 #include "utils.h"
 #include "version.h"
 #include <arpa/inet.h>
@@ -12,8 +13,6 @@
 #define CONFIG_FILE "./proxy.db"
 #define IP_PORT_SEPARATOR ":"
 #define SERVER_PORT 80
-#define MAX_REQUEST_SIZE 256
-#define MAX_CLIENTS 30
 
 int main(int argc, char const *argv[]) {
   signal(SIGPIPE, SIG_IGN);
@@ -30,7 +29,6 @@ int main(int argc, char const *argv[]) {
   }
 
   int i = 0;
-  int n;
   char c;
   char *str;
 
@@ -130,72 +128,11 @@ int main(int argc, char const *argv[]) {
           }
 
           printf("sending request from client to target\n");
-          char request[MAX_REQUEST_SIZE];
-          memset(request, '\0', sizeof request);
-
-          while ((n = read(clientFd, request, sizeof(request) - 1)) > 0) {
-            if (write(targetFd, request, n) < 0) {
-              perror("writing content from client to target failed - probably "
-                     "SIGPIPE\n");
-            }
-
-            char *requestEnd = strstr(request, "\r\n\r\n");
-            memset(request, '\0', sizeof request);
-            if (requestEnd != NULL) {
-              break;
-            }
-          }
-
+          handleRequest(clientFd, targetFd);
           printf("sending response from target to client\n");
-          char response[MAX_REQUEST_SIZE];
-          memset(response, '\0', sizeof response);
-
-          int bodyLen = 0;
-          int isBody = 0;
-          int contentLen = 0;
-          char *contentLenStr;
-          char *marker;
-
-          while ((n = read(targetFd, response, sizeof(response) - 1)) > 0) {
-            marker = strstr(response, "\r\n\r\n");
-
-            if (isBody == 0) {
-              contentLenStr = getHeaderVal(response, "Content-Length");
-            } else if (isBody == 1) {
-              bodyLen += n;
-            }
-
-            if (isBody == 0 && marker != NULL) {
-              isBody = 1;
-              bodyLen += strlen(marker) - 4;
-            }
-
-            if (write(clientFd, response, n) < 0) {
-              perror("writing content from target to client failed - probably "
-                     "SIGPIPE\n");
-            }
-
-            if (contentLenStr != NULL) {
-              contentLen = atoi(contentLenStr);
-              contentLenStr = NULL;
-            }
-
-            if (contentLen != 0) {
-              if (bodyLen == contentLen) {
-                break;
-              }
-            }
-
-            marker = strstr(response, "0\r\n\r\n");
-
-            if (marker != NULL) {
-              break;
-            }
-
-            memset(response, '\0', sizeof response);
-          }
-
+          handleResponse(clientFd, targetFd);
           printf("request completed\n");
+
           FD_CLR(clientFd, &clientFds);
           close(clientFd);
           close(targetFd);

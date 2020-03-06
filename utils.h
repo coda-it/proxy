@@ -5,6 +5,7 @@
 #include <string.h>
 
 #define MAX_CLIENTS 30
+#define CHUNK_SIZE 256
 
 void startTCPSrv(struct sockaddr_in *srvAddr, int *srvFd, unsigned int port) {
   if ((*srvFd = socket(AF_INET, SOCK_STREAM, 0)) == 0) {
@@ -28,12 +29,12 @@ void startTCPSrv(struct sockaddr_in *srvAddr, int *srvFd, unsigned int port) {
   }
 }
 
-char* getHeaderVal(char *request, char *header) {
+char *getHeaderVal(char *request, char *header) {
   static const char headerSeps[] = " :\n\r";
   char *body;
   char *params;
 
-  char* requestCpy = calloc(strlen(request)+1, sizeof(char));
+  char *requestCpy = calloc(strlen(request) + 1, sizeof(char));
   strcpy(requestCpy, request);
 
   body = strtok(requestCpy, headerSeps);
@@ -42,7 +43,7 @@ char* getHeaderVal(char *request, char *header) {
     if (body == NULL) {
       break;
     }
-    //printf("\n|> [%s / %s / %d]",header, body, strcmp(header, body));
+
     if (strcmp(header, body) == 0) {
       return strtok(NULL, headerSeps);
     }
