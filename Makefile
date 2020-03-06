@@ -3,7 +3,7 @@ all:
 
 .PHONY: fix
 fix:
-	clang-format -i -style=file main.c
+	clang-format -i -style=file *.c *.h
 
 .PHONY: version
 version:
