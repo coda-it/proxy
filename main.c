@@ -1,17 +1,14 @@
+#include "config.h"
 #include "handlers.h"
 #include "servers.h"
 #include "version.h"
-#include <arpa/inet.h>
-#include <netinet/in.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <sys/socket.h>
 #include <sys/stat.h>
 #include <unistd.h>
 
 #define CONFIG_FILE "./proxy.db"
-#define IP_PORT_SEPARATOR ":"
 #define SERVER_PORT 80
 
 int main(int argc, char const *argv[]) {
@@ -19,58 +16,10 @@ int main(int argc, char const *argv[]) {
 
   printf("starting proxy %s\n", VERSION);
 
-  printf("reading proxy config file\n");
-  FILE *cnfPtr;
-  cnfPtr = fopen(CONFIG_FILE, "r");
-
-  if (cnfPtr == NULL) {
-    perror("proxy.db is not defined");
-    exit(EXIT_FAILURE);
-  }
-
-  int i = 0;
-  char c;
-  char *str;
-
-  fseek(cnfPtr, 0L, SEEK_END);
-  long cnfSize = ftell(cnfPtr);
-  rewind(cnfPtr);
-  char *cnf;
-  cnf = malloc(sizeof *cnf * cnfSize);
-  memset(cnf, '\0', sizeof *cnf * cnfSize);
-
-  while (c != EOF) {
-    c = fgetc(cnfPtr);
-    cnf[i] = c;
-
-    if (c == EOF) {
-      cnf[i] = '\0';
-    }
-
-    i++;
-  }
-  fclose(cnfPtr);
-
+  char *sourceDomain;
   char *targetIP;
   char *targetPort;
-
-  i = 0;
-
-  str = strtok(cnf, IP_PORT_SEPARATOR);
-  while (i < 2) {
-    if (i == 0) {
-      targetIP = malloc(sizeof *targetIP * strlen(str));
-      targetIP = str;
-    } else {
-      targetPort = malloc(sizeof *targetPort * strlen(str));
-      targetPort = str;
-    }
-
-    str = strtok(NULL, IP_PORT_SEPARATOR);
-    i++;
-  }
-
-  i = 0;
+  readConfig(CONFIG_FILE, &sourceDomain, &targetIP, &targetPort);
 
   struct sockaddr_in serverAddress;
   int serverAddrLen = sizeof(serverAddress);
@@ -108,34 +57,35 @@ int main(int argc, char const *argv[]) {
           printf("client-server connection established\n");
 
         } else {
-          struct sockaddr_in targetAddress;
+          printf("forwarding request with the following parameters:\n");
+          printf("- domain: %s\n", sourceDomain);
+          printf("- targetIP: %s\n", targetIP);
+          printf("- targetPort: %s\n", targetPort);
+
           int targetFd;
+          char *request = NULL;
 
-          targetAddress.sin_family = AF_INET;
-          targetAddress.sin_addr.s_addr = inet_addr(targetIP);
-          targetAddress.sin_port = htons(atoi(targetPort));
-          memset(targetAddress.sin_zero, '\0', sizeof targetAddress.sin_zero);
+          printf("determining target for request\n");
+          readRequest(clientFd, &request);
+          int hasTarget = parseHeaders(sourceDomain, request);
 
-          if ((targetFd = socket(AF_INET, SOCK_STREAM, 0)) == 0) {
-            perror("target socket");
-            exit(EXIT_FAILURE);
+          if (hasTarget) {
+            printf("connecting to target\n");
+            connectToTarget(targetIP, targetPort, &targetFd);
+
+            printf("sending request from client to target\n");
+            forwardRequest(clientFd, targetFd, request);
+
+            printf("sending response from target to client\n");
+            handleResponse(clientFd, targetFd);
+
+            printf("request completed\n");
+            close(targetFd);
           }
 
-          if (connect(targetFd, (struct sockaddr *)&targetAddress,
-                      sizeof(targetAddress)) < 0) {
-            perror("target connection");
-            exit(EXIT_FAILURE);
-          }
-
-          printf("sending request from client to target\n");
-          handleRequest(clientFd, targetFd);
-          printf("sending response from target to client\n");
-          handleResponse(clientFd, targetFd);
-          printf("request completed\n");
-
+          free(request);
           FD_CLR(clientFd, &clientFds);
           close(clientFd);
-          close(targetFd);
         }
       }
     }

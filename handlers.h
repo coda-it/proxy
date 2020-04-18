@@ -1,32 +1,81 @@
 #include "utils.h"
 #include <arpa/inet.h>
+#include <netinet/in.h>
 #include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/socket.h>
 #include <unistd.h>
 
 #define CHUNK_SIZE 256
 #define HEADERS_BODY_SEPARATOR "\r\n\r\n"
 #define CHUNKED_REQUEST_TERMINATION "0\r\n\r\n"
 
-void handleRequest(int clientFd, int targetFd) {
-  char *marker = NULL;
+void readRequest(int clientFd, char **request) {
   int n;
-  char request[CHUNK_SIZE];
-  memset(request, '\0', sizeof request);
+  char requestChunk[CHUNK_SIZE];
+  char *domain;
+  int hasDomain = 0;
+  int requestSize = 0;
 
-  while ((n = read(clientFd, request, sizeof(request) - 1)) > 0) {
-    if (write(targetFd, request, n) < 0) {
-      perror("writing content from client to target failed - probably "
-             "SIGPIPE\n");
+  while ((n = read(clientFd, requestChunk, sizeof(requestChunk) - 1)) > 0) {
+    if (*request != NULL) {
+      requestSize = strlen(*request);
     }
 
-    marker = strstr(request, HEADERS_BODY_SEPARATOR);
-    memset(request, '\0', sizeof request);
-    if (marker != NULL) {
+    *request = realloc(*request, (requestSize + n) * sizeof(char));
+    strncpy(*request + requestSize, requestChunk, n);
+
+    if (n < CHUNK_SIZE) {
       break;
     }
+  }
+
+  requestSize = strlen(*request);
+  *request = realloc(*request, (requestSize + 1) * sizeof(char));
+  strcpy(*request + requestSize + 1, "\0");
+}
+
+int parseHeaders(char *sourceDomain, char *request) {
+  char *domain;
+  int hasDomain = 0;
+
+  domain = getHeaderVal(request, "X-Domain");
+
+  if (domain != NULL && strcmp(domain, sourceDomain) == 0) {
+    hasDomain = 1;
+  }
+
+  return hasDomain;
+}
+
+void connectToTarget(char *targetIP, char *targetPort, int *targetFd) {
+  struct sockaddr_in targetAddress;
+  targetAddress.sin_family = AF_INET;
+  targetAddress.sin_addr.s_addr = inet_addr(targetIP);
+  targetAddress.sin_port = htons(atoi(targetPort));
+  memset(targetAddress.sin_zero, '\0', sizeof targetAddress.sin_zero);
+
+  if ((*targetFd = socket(AF_INET, SOCK_STREAM, 0)) == 0) {
+    perror("target socket");
+    exit(EXIT_FAILURE);
+  }
+
+  if (connect(*targetFd, (struct sockaddr *)&targetAddress,
+              sizeof(targetAddress)) < 0) {
+    perror("target connection");
+    exit(EXIT_FAILURE);
+  }
+}
+
+void forwardRequest(int clientFd, int targetFd, char *request) {
+  char *marker = NULL;
+  int n;
+
+  if (write(targetFd, request, strlen(request) + 1) < 0) {
+    perror("writing content from client to target failed - probably "
+           "SIGPIPE\n");
   }
 }
 

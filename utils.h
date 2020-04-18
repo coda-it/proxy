@@ -9,7 +9,6 @@
 char *getHeaderVal(char *request, char *header) {
   char *body;
   char *params;
-
   char *requestCpy = calloc(strlen(request) + 1, sizeof(char));
   strcpy(requestCpy, request);
 
@@ -21,6 +20,7 @@ char *getHeaderVal(char *request, char *header) {
     }
 
     if (strcmp(header, body) == 0) {
+      free(requestCpy);
       return strtok(NULL, HEADER_SEPARATOR);
     }
     body = strtok(NULL, HEADER_SEPARATOR);
