@@ -4,8 +4,9 @@
 
 #define IP_PORT_SEPARATOR ":"
 
-void readConfig(char* filePath, char **targetIP, char **targetPort) {
- printf("reading proxy config file\n");
+void readConfig(char *filePath, char **sourceDomain, char **targetIP,
+                char **targetPort) {
+  printf("reading proxy config file\n");
   FILE *cnfPtr;
   cnfPtr = fopen(filePath, "r");
 
@@ -40,8 +41,11 @@ void readConfig(char* filePath, char **targetIP, char **targetPort) {
   i = 0;
 
   str = strtok(cnf, IP_PORT_SEPARATOR);
-  while (i < 2) {
+  while (i < 3) {
     if (i == 0) {
+      *sourceDomain = malloc(sizeof **sourceDomain * strlen(str));
+      *sourceDomain = str;
+    } else if (i == 1) {
       *targetIP = malloc(sizeof **targetIP * strlen(str));
       *targetIP = str;
     } else {
