@@ -43,7 +43,7 @@ int parseHeaders(char *sourceDomain, char *request) {
 
   domain = getHeaderVal(request, "X-Domain");
 
-  if (strcmp(domain, sourceDomain) == 0) {
+  if (domain != NULL && strcmp(domain, sourceDomain) == 0) {
     hasDomain = 1;
   }
 
@@ -73,8 +73,6 @@ void forwardRequest(int clientFd, int targetFd, char *request) {
   char *marker = NULL;
   int n;
 
-  printf("--- Request: \n");
-  printf("%s", request);
   if (write(targetFd, request, strlen(request) + 1) < 0) {
     perror("writing content from client to target failed - probably "
            "SIGPIPE\n");
@@ -91,9 +89,8 @@ void handleResponse(int clientFd, int targetFd) {
 
   char response[CHUNK_SIZE];
   memset(response, '\0', sizeof response);
-  printf("--- Response: \n");
+
   while ((n = read(targetFd, response, sizeof(response) - 1)) > 0) {
-    printf("%s", response);
     marker = strstr(response, HEADERS_BODY_SEPARATOR);
 
     if (isBody == 0) {
