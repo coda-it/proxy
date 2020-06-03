@@ -2,6 +2,7 @@
 #include "handlers.h"
 #include "servers.h"
 #include "version.h"
+#include <signal.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
