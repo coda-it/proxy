@@ -10,10 +10,14 @@
 
 #define CHUNK_SIZE 256
 #define HEADERS_BODY_SEPARATOR "\r\n\r\n"
+#define REQUEST_TERMINATION "\r\n\r\n"
 #define CHUNKED_REQUEST_TERMINATION "0\r\n\r\n"
+#define MATCH_HEADER "Host"
 
 void readRequest(int clientFd, char **request) {
+  char *marker = NULL;
   int n;
+  int isBody = 0;
   char requestChunk[CHUNK_SIZE];
   char *domain;
   int hasDomain = 0;
@@ -27,21 +31,34 @@ void readRequest(int clientFd, char **request) {
     *request = realloc(*request, (requestSize + n) * sizeof(char));
     strncpy(*request + requestSize, requestChunk, n);
 
-    if (n < CHUNK_SIZE) {
-      break;
+    marker = strstr(requestChunk, HEADERS_BODY_SEPARATOR);
+
+    if (isBody == 0 && marker != NULL) {
+      printf("\n(inBody)\n");
+      isBody = 1;
     }
+
+    if (isBody) {
+      marker = strstr(requestChunk, REQUEST_TERMINATION);
+
+      if (marker != NULL) {
+        break;
+      }
+    }
+
+    memset(requestChunk, '\0', sizeof requestChunk);
   }
 
   requestSize = strlen(*request);
   *request = realloc(*request, (requestSize + 1) * sizeof(char));
-  strcpy(*request + requestSize + 1, "\0");
+  strcpy(*request + requestSize, "\0");
 }
 
 int parseHeaders(char *sourceDomain, char *request) {
   char *domain;
   int hasDomain = 0;
 
-  domain = getHeaderVal(request, "X-Domain");
+  domain = getHeaderVal(request, MATCH_HEADER);
 
   if (domain != NULL && strcmp(domain, sourceDomain) == 0) {
     hasDomain = 1;

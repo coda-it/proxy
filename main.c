@@ -82,6 +82,8 @@ int main(int argc, char const *argv[]) {
 
             printf("request completed\n");
             close(targetFd);
+          } else {
+            printf("no target found\n");
           }
 
           free(request);

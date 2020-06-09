@@ -9,4 +9,4 @@ Current features:
 
 ### Testing
 How to test:
-curl -H "X-Domain: domain.xyz" -X GET http://localhost
+curl -H "Host: domain.xyz" -X GET http://localhost
