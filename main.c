@@ -2,6 +2,7 @@
 #include "handlers.h"
 #include "servers.h"
 #include "version.h"
+#include <signal.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -81,6 +82,8 @@ int main(int argc, char const *argv[]) {
 
             printf("request completed\n");
             close(targetFd);
+          } else {
+            printf("no target found\n");
           }
 
           free(request);
