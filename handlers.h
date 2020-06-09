@@ -34,7 +34,6 @@ void readRequest(int clientFd, char **request) {
     marker = strstr(requestChunk, HEADERS_BODY_SEPARATOR);
 
     if (isBody == 0 && marker != NULL) {
-      printf("\n(inBody)\n");
       isBody = 1;
     }
 
